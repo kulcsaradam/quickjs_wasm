@@ -1,0 +1,51 @@
+CONFIG_BIGNUM=y
+OBJDIR=.obj
+  
+CFLAGS+ =-g -Wall -MMD -MF $(OBJDIR)/$(@F).d
+CFLAGS += -Wextra
+CFLAGS += -Wno-sign-compare
+CFLAGS += -Wno-missing-field-initializers
+CFLAGS += -Wundef -Wuninitialized
+CFLAGS += -Wunused -Wno-unused-parameter
+CFLAGS += -Wwrite-strings
+CFLAGS += -Wchar-subscripts -funsigned-char
+CFLAGS += -Wno-cast-function-type-mismatch
+CFLAGS += -MMD -MF $(OBJDIR)/$(@F).d
+
+CFLAGS_DEBUG=$(CFLAGS) -O0
+CFLAGS_SMALL=$(CFLAGS) -Os
+CFLAGS_OPT=$(CFLAGS) -O2
+CFLAGS_NOLTO:=$(CFLAGS_OPT)
+
+HOST_LIBS=-lm -ldl -lpthread
+LIBS=-lm
+LIBS+=$(EXTRA_LIBS)
+
+DEFINES:=-D_GNU_SOURCE -DCONFIG_VERSION=\"2024-02-1\"
+CFLAGS += $(DEFINES)
+
+$(OBJDIR):
+	mkdir -p $(OBJDIR) $(OBJDIR)/examples $(OBJDIR)/tests
+
+all: $(OBJDIR) $(OBJDIR)/quickjs.check.o $(OBJDIR)/qjs.check.o qjs
+
+$(OBJDIR)/%.check.o: %.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -DCONFIG_CHECK_JSVALUE -c -o $@ $<
+
+$(OBJDIR)/%.o: %.c | $(OBJDIR)
+	$(CC) -sWASM=1 $(CFLAGS_OPT) -c -o $@ $<
+
+qjs: $(QJS_OBJS)
+	$(CC) $(LDFLAGS) $(LDEXPORT) -o qjs.wasm $^ $(LIBS)
+
+qjsc: $(OBJDIR)/qjsc.o $(QJS_LIB_OBJS)
+	$(CC) $(LDFLAGS) -o qjsc.wasm $^ $(LIBS)
+
+clean:
+	rm -f repl.c qjscalc.c out.c
+	rm -f *.a *.o *.d *~ unicode_gen regexp_test fuzz_eval fuzz_compile fuzz_regexp $(PROGS)
+	rm -f hello.c test_fib.c
+	rm -f examples/*.so tests/*.so
+	rm -rf $(OBJDIR)/ *.dSYM/ qjs-debug
+	rm -rf run-test262-debug run-test262-32
+	rm -f run_octane run_sunspider_like
